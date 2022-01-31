@@ -79,7 +79,7 @@ def get_gt_boxes(sample):
     return boxes_gt_pixels, boxes_gt, boxes, data_path_f, cam_front_data_f
 
 # Compare boxes:
-def compare_boxes(boxes_gt, boxes_yolo, boxes_gt_pixels):
+def compare_boxes(boxes_gt, boxes_yolo_pixels, boxes_gt_pixels):
     matchings = {}
     boxes_gt_dict = {}
     boxes_yolo_dict = {}
@@ -89,21 +89,26 @@ def compare_boxes(boxes_gt, boxes_yolo, boxes_gt_pixels):
         matchings[i] = []
         i += 1
     i= 0
-    for box_yolo in boxes_yolo:
+    for box_yolo in boxes_yolo_pixels:
         boxes_yolo_dict[i] = box_yolo
         i += 1
 
     for box_gt_i in boxes_gt_dict.keys():
         for box_yolo_i in boxes_yolo_dict.keys():
-            box1 = boxes_gt_dict[box_gt_i]
-            box2 = boxes_yolo_dict[box_yolo_i]
-            box_yolo = box(*box2)
-            iou = boxes_iou(box1, box2)
+            box_gt = boxes_gt_dict[box_gt_i]
+            if box_yolo_i == 0:
+                print("Found yolo truck")
+                if box_gt_i == 3:
+                    print("Found correct ground truth prediction")
+                    pdb.set_trace()
+            box_yolo = boxes_yolo_dict[box_yolo_i]
+            box_yolo = prepare_yolo_box(box_yolo)
+            iou = compute_iou(box_gt, box_yolo)
             print("GT: ")
-            print(box1)
+            print(box_gt)
             print("YoLo: ")
-            print(box2)
-            if iou >= 0.8:
+            print(box_yolo)
+            if iou >= 0.6:
                 matchings[box_gt_i].append(box_yolo_i)
                 print("Match found")
     return matchings
@@ -128,21 +133,22 @@ for i in range(Nscenes):
         # pdb.set_trace()
         # Get Yolo Boxes:
         print("Getting YoLo predicted 2D boxes: ")
-        boxes, boxes_yolo = get_yolo_boxes(yolo, data_path)
+        boxes_yolo, boxes_yolo_pixels = get_yolo_boxes(yolo, data_path)
 
         # Plot boxes on single image:
+
         if PLOT:
             fname_configs = {'scene_number': i, 'sample_number': sample_number}
             plot_boxes_both(boxes_gt_pixels, boxes_nusc, boxes_yolo, data_path, cam_data, fname_configs)
 
         # Compare bounding boxes:
-        compare_boxes(boxes_gt, boxes_yolo, boxes_gt_pixels)
+        pdb.set_trace()
+        matchings = compare_boxes(boxes_gt, boxes_yolo_pixels, boxes_gt_pixels)
 
         # Update sample number:
         next_sample_token = sample['next']
         sample = nusc.get('sample', next_sample_token)
         sample_number += 1
-        pdb.set_trace()
 
 # Draw 2D boxes:
 # data_path, boxes, camera_intrinsic = nusc.get_sample_data(cam_front_data_f['token'], box_vis_level=BoxVisibility.ANY)

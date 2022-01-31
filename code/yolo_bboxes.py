@@ -242,6 +242,57 @@ def box_nusc(boxes, camera_intrinsic):
         nusc_boxes.append(final_coords)
     return nusc_boxes
 
+# Compute iou of two boxes:
+def compute_iou(box1, box2):
+    '''
+    box: [xmin, ymin, wx, wy] where (xmin,ymin) are coordinates of lower left corner and wx = xmax - xmin and wy = ymax-ymin
+    Assumption: box1's lower left corner is closer to (0,0)
+    '''
+    # Get the Width and Height of each bounding box
+    xmin1, ymin1, xmax1, ymax1 = parse_box(box1)
+    xmin2, ymin2, xmax2, ymax2 = parse_box(box2)
+    width_box1 = abs(box1[2])
+    height_box1 = abs(box1[3])
+    width_box2 = abs(box2[2])
+    height_box2 = abs(box2[3])
+
+    # Calculate the area of the each bounding box
+    area_box1 = width_box1 * height_box1
+    area_box2 = width_box2 * height_box2
+
+    # Find intersecting points
+    xmin_int, ymin_int, xmax_int, ymax_int = find_intersection(box1, box2)
+    intersection_width = xmax_int - xmin_int
+    intersection_height = ymax_int - ymin_int
+
+#     if intersection_width > 0 and intersection_height > 0:
+#         pdb.set_trace()
+    # If the the boxes don't overlap then their IOU is zero
+    if intersection_width <= 0 or intersection_height <= 0:
+        return 0.0
+
+    # Calculate the area of intersection of the two bounding boxes
+    intersection_area = intersection_width * intersection_height
+
+    # Calculate the area of the union of the two bounding boxes
+    union_area = area_box1 + area_box2 - intersection_area
+
+    # Calculate the IOU
+    iou = intersection_area/union_area
+
+    return iou
+
+# Preparing YoLo boxes:
+def prepare_yolo_box(yolobox):
+    yolo_xmin = yolobox[0] # x1
+    yolo_ymax = yolobox[1] # y2
+    yolo_wx = yolobox[2] # wx = x2-x1
+    yolo_wy = yolobox[3]
+    yolo_xmax = yolo_wx + yolo_xmin
+    yolo_ymin = yolo_wy + yolo_ymax
+    yolo_box_new = [yolo_xmin, yolo_ymin, yolo_xmax-yolo_xmin, yolo_ymin-yolo_ymax]
+    return yolo_box_new
+
 # Plotting 2D bounding boxes for Nuscenes:
 def plot_nusc_bboxes_2D(data_path, camera_intrinsic, boxes, imsize, ax=None):
     im = cv2.imread(data_path)
