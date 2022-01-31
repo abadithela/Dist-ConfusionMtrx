@@ -69,17 +69,18 @@ def get_gt_boxes(sample):
     # pdb.set_trace()
     boxes_gt_pixels = box_nusc(boxes, camera_intrinsic)
     boxes_gt = []
-    for pixel_box in boxes_gt_pixels:
-        min_x = pixel_box[0]
-        max_y = pixel_box[3]
-        width_x = pixel_box[2] - pixel_box[0]
-        width_y = pixel_box[3] - pixel_box[1]
-        # pdb.set_trace()
-        boxes_gt.append([min_x, max_y, width_x, width_y])
-    return boxes_gt_pixels, boxes_gt, boxes, data_path_f, cam_front_data_f
+    return boxes_gt_pixels, boxes, data_path_f, cam_front_data_f
+
+def prepare_gt_box(nubox):
+    xmin = nubox[0]
+    ymin = nubox[1]
+    xmax = nubox[2]
+    ymax = nubox[3]
+    new_nusc_box = [xmin, ymin, xmax-xmin, ymin-ymax]
+    return new_nusc_box
 
 # Compare boxes:
-def compare_boxes(boxes_gt, boxes_yolo_pixels, boxes_gt_pixels):
+def compare_boxes(boxes_gt, boxes_yolo_pixels):
     matchings = {}
     boxes_gt_dict = {}
     boxes_yolo_dict = {}
@@ -96,13 +97,14 @@ def compare_boxes(boxes_gt, boxes_yolo_pixels, boxes_gt_pixels):
     for box_gt_i in boxes_gt_dict.keys():
         for box_yolo_i in boxes_yolo_dict.keys():
             box_gt = boxes_gt_dict[box_gt_i]
-            if box_yolo_i == 0:
-                print("Found yolo truck")
-                if box_gt_i == 3:
-                    print("Found correct ground truth prediction")
-                    pdb.set_trace()
+            # if box_yolo_i == 0:
+            #     print("Found yolo truck")
+            #     if box_gt_i == 3:
+            #         print("Found correct ground truth prediction")
+            #         pdb.set_trace()
             box_yolo = boxes_yolo_dict[box_yolo_i]
             box_yolo = prepare_yolo_box(box_yolo)
+            box_gt = prepare_gt_box(box_gt)
             iou = compute_iou(box_gt, box_yolo)
             print("GT: ")
             print(box_gt)
@@ -119,6 +121,7 @@ Nscenes = len(nusc.scene)
 # instantiating YoLo obkect:
 yolo = YoLo( nms_thresh, iou_thresh)
 for i in range(Nscenes):
+    i = 8
     scene = nusc.scene[i]
     print("Evaluating scene {0}: ".format(i))
     print(scene)
@@ -129,7 +132,7 @@ for i in range(Nscenes):
     while sample_number <= scene['nbr_samples']:
         # Get ground truth 2D boxes for front camera:
         print("Getting Nuscenes ground truth 2D boxes: ")
-        boxes_gt_pixels, boxes_gt, boxes_nusc, data_path, cam_data = get_gt_boxes(sample)
+        boxes_gt_pixels, boxes_nusc, data_path, cam_data = get_gt_boxes(sample)
         # pdb.set_trace()
         # Get Yolo Boxes:
         print("Getting YoLo predicted 2D boxes: ")
@@ -142,9 +145,8 @@ for i in range(Nscenes):
             plot_boxes_both(boxes_gt_pixels, boxes_nusc, boxes_yolo, data_path, cam_data, fname_configs)
 
         # Compare bounding boxes:
+        matchings = compare_boxes(boxes_gt_pixels, boxes_yolo_pixels)
         pdb.set_trace()
-        matchings = compare_boxes(boxes_gt, boxes_yolo_pixels, boxes_gt_pixels)
-
         # Update sample number:
         next_sample_token = sample['next']
         sample = nusc.get('sample', next_sample_token)

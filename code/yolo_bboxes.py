@@ -24,7 +24,9 @@ dataroot="/Users/apurvabadithela/Documents/software/nuscenes/data/sets/nuscenes"
 nusc = NuScenes(dataroot="/Users/apurvabadithela/Documents/software/nuscenes/data/sets/nuscenes/")
 nms_thresh = 0.6
 iou_thresh = 0.4
-
+namesfile = 'data/coco.names'
+### Load the COCO object classes
+class_names = load_class_names(namesfile)
 class YoLo():
     def __init__(self, nms_thresh, iou_thresh):
         self.nms_thresh = nms_thresh
@@ -40,7 +42,6 @@ class YoLo():
         namesfile = 'data/coco.names'
         ### Load the COCO object classes
         class_names = load_class_names(namesfile)
-        print(class_names)
         ### Load the network architecture
         m = Darknet(cfg_file)
         ### Load the pre-trained weights
@@ -67,7 +68,7 @@ class YoLo():
         # Print the objects found and the confidence level
         print_objects(boxes, self.class_names)
         #Plot the image with bounding boxes and corresponding object class labels
-        plot_boxes(original_image, boxes, self.class_names, plot_labels = True)
+        # plot_boxes(original_image, boxes, self.class_names, plot_labels = True)
         return boxes, boxes_pixels_yolo
 
 
@@ -242,6 +243,22 @@ def box_nusc(boxes, camera_intrinsic):
         nusc_boxes.append(final_coords)
     return nusc_boxes
 
+def parse_box(box):
+    xmin = box[0]
+    ymin = box[1]
+    xmax = box[2] + xmin
+    ymax = -box[3] + ymin
+    return xmin, ymin, xmax, ymax
+
+def find_intersection(box1, box2):
+    xmin1, ymin1, xmax1, ymax1 = parse_box(box1)
+    xmin2, ymin2, xmax2, ymax2 = parse_box(box2)
+    xmin_int = max(xmin1, xmin2)
+    xmax_int = min(xmax1, xmax2)
+    ymin_int = max(ymin1, ymin2)
+    ymax_int = min(ymax1, ymax2)
+    return xmin_int, ymin_int, xmax_int, ymax_int
+    
 # Compute iou of two boxes:
 def compute_iou(box1, box2):
     '''
