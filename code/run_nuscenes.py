@@ -7,6 +7,7 @@ dataroot="/Users/apurvabadithela/Documents/software/nuscenes/data/sets/nuscenes"
 from nuscenes.nuscenes import NuScenes, NuScenesExplorer
 from yolo_bboxes import *
 from shapely.geometry import MultiPoint, box
+import pickle as pkl
 
 nusc = NuScenes(dataroot="/Users/apurvabadithela/Documents/software/nuscenes/data/sets/nuscenes/")
 nms_thresh = 0.6
@@ -55,6 +56,8 @@ def is_cam_front_ann_token(anntoken: str,
     else:
         return False
 
+# Collect all instances captured in the first annotation of the object:
+
 # Function to get yOlO Boxes:
 def get_yolo_boxes(yolo, data_path):
     boxes, boxes_pixels_yolo = yolo.yolo(data_path)
@@ -86,12 +89,13 @@ def compare_boxes(boxes_gt, boxes_yolo_pixels):
     boxes_yolo_dict = {}
     i = 0
     for box_gt in boxes_gt:
-        boxes_gt_dict[i] = box_gt
-        matchings[i] = []
+        boxes_gt_dict[i] = prepare_gt_box(box_gt)
+        matchings[i] = dict()
+        matchings[i]["yolo_match"] = []
         i += 1
     i= 0
     for box_yolo in boxes_yolo_pixels:
-        boxes_yolo_dict[i] = box_yolo
+        boxes_yolo_dict[i] = prepare_yolo_box(box_yolo)
         i += 1
 
     for box_gt_i in boxes_gt_dict.keys():
@@ -106,30 +110,32 @@ def compare_boxes(boxes_gt, boxes_yolo_pixels):
             box_yolo = prepare_yolo_box(box_yolo)
             box_gt = prepare_gt_box(box_gt)
             iou = compute_iou(box_gt, box_yolo)
-            print("GT: ")
-            print(box_gt)
-            print("YoLo: ")
-            print(box_yolo)
+            # print("GT: ")
+            # print(box_gt)
+            # print("YoLo: ")
+            # print(box_yolo)
             if iou >= 0.6:
-                matchings[box_gt_i].append(box_yolo_i)
+                matchings[box_gt_i]["yolo_match"].append(box_yolo_i)
                 print("Match found")
     return matchings
 
 # Iterating over scenes
-print(nusc.list_sample)
+# print(nusc.list_sample)
 Nscenes = len(nusc.scene)
 # instantiating YoLo obkect:
 yolo = YoLo( nms_thresh, iou_thresh)
-for i in range(Nscenes):
-    i = 8
+print(Nscenes)
+for i in range(0,Nscenes+1):
+    print("Iteration ........ ", str(i))
+    objects_detected = dict() # Matchings over objects detected
     scene = nusc.scene[i]
-    print("Evaluating scene {0}: ".format(i))
-    print(scene)
+    # print(scene)
     # iterating over timestamps / samples:
     sample_token = scene['first_sample_token']
     sample = nusc.get('sample', scene['first_sample_token'])
     sample_number = 1
-    while sample_number <= scene['nbr_samples']:
+
+    while sample_number < scene['nbr_samples']:
         # Get ground truth 2D boxes for front camera:
         print("Getting Nuscenes ground truth 2D boxes: ")
         boxes_gt_pixels, boxes_nusc, data_path, cam_data = get_gt_boxes(sample)
@@ -146,11 +152,28 @@ for i in range(Nscenes):
 
         # Compare bounding boxes:
         matchings = compare_boxes(boxes_gt_pixels, boxes_yolo_pixels)
-        pdb.set_trace()
+        objects_detected[sample_number] = matchings
+
+        # Add annotations:
+        for i in range(len(boxes_nusc)):
+            nubox = boxes_nusc[i] # Box object
+            matchings[i]['nusc_token'] = nubox.token
+            matchings[i]['category'] = nubox.name
+
         # Update sample number:
         next_sample_token = sample['next']
         sample = nusc.get('sample', next_sample_token)
         sample_number += 1
+
+    # Save data:
+    cwd = os.getcwd()
+    dirname = cwd + "/matchings"
+    # pdb.set_trace()
+    if os.path.exists(dirname) is False:
+        os.mkdir(dirname)
+    fname = dirname + "/scene_"+str(i)+"_matchings.p"
+    pkl.dump(objects_detected, open(fname, "wb"))
+
 
 # Draw 2D boxes:
 # data_path, boxes, camera_intrinsic = nusc.get_sample_data(cam_front_data_f['token'], box_vis_level=BoxVisibility.ANY)

@@ -258,7 +258,7 @@ def find_intersection(box1, box2):
     ymin_int = max(ymin1, ymin2)
     ymax_int = min(ymax1, ymax2)
     return xmin_int, ymin_int, xmax_int, ymax_int
-    
+
 # Compute iou of two boxes:
 def compute_iou(box1, box2):
     '''
