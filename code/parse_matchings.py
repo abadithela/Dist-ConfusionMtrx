@@ -8,8 +8,9 @@ import numpy as np
 cwd = os.getcwd()
 dirname = cwd + "/matchings_new"
 import pdb
+
 class ConfusionMatrix():
-    def __init__(self, classes, distance_bins):
+    def __init__(self, classes, distance_bin=4):
         self.distance_bins = distance_bins # Number of different splits within a total of 100 m
         self.horizon = 100.0
         self.create_distance_markers() # Upper bound for each confusion matrix
@@ -40,28 +41,31 @@ class ConfusionMatrix():
 
     def find_distance_bin(self, distance_to_ego):
         for i in range(1, len(self.markers)):
-            if distance_to_ego < self.markers[i] and distance_to_ego >= self.markers[i-1]
+            if distance_to_ego < self.markers[i] and distance_to_ego >= self.markers[i-1]:
                 return i-1, self.markers[i-1]
 
-    def process_detections(self, matchings):
-        for detection in matchings:
-            prediction_class = detection[0]
-            true_class = detection[1]
-            distance_to_ego = detection[2]
-            distance_bin = self.find_distance_bin(distance_to_ego)
-            self.add_prediction(distance_bin, true_class, predicted_class)
+    def process_detections(self, detection):
+        prediction_class = detection[0]
+        true_class = detection[1]
+        distance_to_ego = detection[2]
+        distance_bin = self.find_distance_bin(distance_to_ego)
+        self.add_prediction(distance_bin, true_class, predicted_class)
 
-    def compute_true_pos(self, class, conf_mat_indx):
+    def compute_true_pos(self, conf_mat_indx):
         conf_matrix = self.C[conf_mat_indx].copy()
+        pass
 
-    def compute_true_neg(self, class, conf_mat_indx):
-        conf_matrix = self.C[conf_mat_indx].copy()
-
-    def compute_false_neg(self, class, conf_mat_indx):
-        conf_matrix = self.C[conf_mat_indx].copy()
-
-    def compute_false_pos(self, class, conf_mat_indx):
-        conf_matrix = self.C[conf_mat_indx].copy()
+    # def compute_true_neg(self, class, conf_mat_indx):
+    #     conf_matrix = self.C[conf_mat_indx].copy()
+    #     pass
+    #
+    # def compute_false_neg(self, class, conf_mat_indx):
+    #     conf_matrix = self.C[conf_mat_indx].copy()
+    #     pass
+    #
+    # def compute_false_pos(self, class, conf_mat_indx):
+    #     conf_matrix = self.C[conf_mat_indx].copy()
+    #     pass
 
     def print(self):
         for i in range(self.distance_bins):
@@ -81,17 +85,39 @@ def cluster_categories(categories):
                 sup_categories[category] = "obstacle"
     return sup_categories
 
-if __name__ == '__main__':
-    categories = nusc.list_categories()
-    sup_categories = cluster_categories(categories)
+def process_objects_detected(C, objects_detected, category_map):
+    for sample, sample_matchings in objects_detected.items():
+        for gt_box_index in sample_matchings.keys():
+            box = sample_matchings[gt_box_index]
+            true_class = category_map[box['category']]
+            distance_to_ego = box['distance_to_ego']
+            # index, marker = C.find_distance_bin(distance_to_ego)
+            if box["yolo_match"]:
+                predicted_class = box["yolo_match"]["pred_class"]
+                detection = [predicted_class, true_class, distance_to_ego]
+                C.process_detections(detection) # Adding to confusion matrix
 
+if __name__ == '__main__':
+    categories = []
+    for category_dict in nusc.category:
+        cat_name = category_dict['name']
+        if cat_name not in categories:
+            categories.append(cat_name)
+    sup_categories = cluster_categories(categories)
+    classes = ["pedestrian", "obstacle", "vehicle"]
+    distance_bins = 4
+    C = ConfusionMatrix(classes, distance_bins)
+
+    Nscenes = len(nusc.scene)
     for n in range(1,Nscenes+1):
         scene = nusc.scene[n-1]
         fname = dirname + "/scene_"+str(n)+"_matchings.p"
         with (open(fname, "rb")) as openfile:
             try:
                 objects_detected = pkl.load(openfile)
+                process_objects_detected(C, objects_detected, sup_categories)
                 pdb.set_trace()
+
             except EOFError:
                 print("Error opening file")
                 break

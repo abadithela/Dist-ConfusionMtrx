@@ -174,10 +174,8 @@ for n in range(1,Nscenes+1):
 
         # Compare bounding boxes:
         matchings, matched_gt_boxes, matched_yolo_boxes = compare_boxes(boxes_gt_pixels, boxes_yolo_pixels)
-        objects_detected[sample_number] = matchings
 
         # compute distance from ego to annotations:
-        #
 
         # Plot boxes on single image:
         # plot only matched boxes
@@ -202,11 +200,23 @@ for n in range(1,Nscenes+1):
             matchings[j]['distance_to_ego'] = distance_to_annotations[nubox.token] # Distance to ego
             matchings[j]['category'] = nubox.name
 
+            if matchings[j]["yolo_match"]:
+                yolo_id = matchings[j]["yolo_match"]["box_id"]
+                yolo_box_id = boxes_yolo[yolo_id]
+                if class_names[yolo_box_id[6]] in ["car", "truck", "bus"]:
+                    matchings[j]["yolo_match"]["pred_class"] = "vehicle"
+                elif class_names[yolo_box_id[6]] == "person":
+                    matchings[j]["yolo_match"]["pred_class"] = "pedestrian"
+                else:
+                    matchings[j]["yolo_match"]["pred_class"] = "obstacle"
+
+        # Store all matchings at the end
+        objects_detected[sample_number] = matchings
         # Update sample number:
         sample_token = sample['next']
         sample = nusc.get('sample', sample_token)
         sample_number += 1
-
+    # pdb.set_trace()
     # Save data:
     cwd = os.getcwd()
     dirname = cwd + "/matchings_new"
