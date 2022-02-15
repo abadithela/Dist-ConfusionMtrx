@@ -311,10 +311,11 @@ def prepare_yolo_box(yolobox):
     return yolo_box_new
 
 # Plotting 2D bounding boxes for Nuscenes:
-def plot_nusc_bboxes_2D(data_path, camera_intrinsic, boxes, imsize, ax=None):
+def plot_nusc_bboxes_2D(data_path, camera_intrinsic, boxes, fname_configs, ax=None):
     im = cv2.imread(data_path)
+    imsize = (1600,900)
 
-    nusc_boxes = box_nusc(boxes, camera_intrinsic) # Getting all the nuscenes boxes in 2D projection
+    nusc_boxes = box_nusc(boxes, camera_intrinsic) # Getting all the nuscenes
 
     # Creating a new axis if none
     if ax is None:
@@ -328,16 +329,24 @@ def plot_nusc_bboxes_2D(data_path, camera_intrinsic, boxes, imsize, ax=None):
         ymin = box[1]
         xmax = box[2]
         ymax = box[3]
-        c = np.array(list(nusc.colormap[box_3D.name]))/255.0
-        colors = (c,c,c)
+        co = np.array([255.0, 255.0, 0])
+        colors = (co,co,co)
         corners = [[xmin, ymax], [xmin, ymin], [xmax, ymin], [xmax, ymax]]
         draw_rect(corners, colors[0][::-1], im)
-        print(box)
+        # print(box)
 
     # Plot image on axis
     im = cv2.resize(im, imsize)
     ax.imshow(im)
-    return im
+
+    # Saving figures in imglib
+    cwd = os.getcwd()
+    dirname = cwd + "/imglib/scene_"+str(fname_configs['scene_number'])
+    # pdb.set_trace()
+    if os.path.exists(dirname) is False:
+        os.mkdir(dirname)
+    fname = dirname + "/gt_sample_no_{0}.pdf".format(fname_configs['sample_number'])
+    plt.savefig(fname, dpi='figure', format='pdf')
 
 # Plotting 2D Yolo bounding boxes:
 def plot_yolo_bboxes(im, ax, boxes_pixels_yolo):
@@ -357,7 +366,7 @@ def plot_yolo_bboxes(im, ax, boxes_pixels_yolo):
     plt.imshow(im)
 
 # Plot Yolo and Nuscenes boxes together:
-def plot_boxes_both(nusc_boxes, boxes, boxes_pixels_yolo, impath, data, fname_configs):
+def plot_boxes_both(nusc_boxes, boxes_pixels_yolo, impath, data, fname_configs):
     im = cv2.imread(impath)
     sd_record = nusc.get('sample_data', data['token'])
     imsize = (sd_record['width'], sd_record['height'])
@@ -366,29 +375,40 @@ def plot_boxes_both(nusc_boxes, boxes, boxes_pixels_yolo, impath, data, fname_co
         _, ax = plt.subplots(1, 1, figsize=(9, 16))
 
     # Show image.
+    print("YoLo bounding boxes")
+    for ii in range(len(boxes_pixels_yolo)):
+        yolobox = boxes_pixels_yolo[ii]
+        yolo_xmin = yolobox[0] # x1
+        yolo_ymin = yolobox[1] # y2
+        yolo_wx = yolobox[2] # wx = x2-x1
+        yolo_wy = yolobox[3] # wy = y1-y2
+        yolo_xmax = yolo_wx + yolo_xmin
+        yolo_ymax = -1*yolo_wy + yolo_ymin
+        co = np.array([0.0, 0.0, 255.0]) # Red detected
+        colors = (co,co,co)
+        corners = [[yolo_xmin, yolo_ymax], [yolo_xmin, yolo_ymin], [yolo_xmax, yolo_ymin], [yolo_xmax, yolo_ymax]]
+        draw_rect(corners, colors[0][::-1], im)
+
     # ax.imshow(im)
     for ii in range(len(nusc_boxes)):
-        box_3D = boxes[ii]
         # pdb.set_trace()
         box = nusc_boxes[ii]
         xmin = box[0]
         ymin = box[1]
-        xmax = box[2]
-        ymax = box[3]
-        co = np.array(list(nusc.colormap[box_3D.name]))/255.0
+        wx = box[2] # wx = x2-x1
+        wy = box[3]
+        xmax = wx + xmin
+        ymax = -1*wy + ymin
+
+        co = np.array([255.0, 255.0, 0])  # Blue ground truth
         colors = (co,co,co)
         corners = [[xmin, ymax], [xmin, ymin], [xmax, ymin], [xmax, ymax]]
         draw_rect(corners, colors[0][::-1], im)
-        print(box)
 
     # Render.
     name = "Localization"
     im = cv2.resize(im, imsize)
     ax.imshow(im)
-
-    print("YoLo bounding boxes")
-    for ii in range(len(boxes_pixels_yolo)):
-        plot_pixel_boxes(boxes_pixels_yolo[ii], im, ax)
 
     # Saving figures in imglib
     cwd = os.getcwd()
