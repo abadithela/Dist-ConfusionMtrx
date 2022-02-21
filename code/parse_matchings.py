@@ -22,7 +22,7 @@ class ConfusionMatrix():
         for k in range(len(classes)):
             self.map[k] = classes[k]
         self.classes.append("no detection")
-        self.map[len(classes)] = "empty"
+        self.map[len(classes)-1] = "empty"
         self.reverse_map = {v: k for k, v in self.map.items()}
 
     def create_distance_markers(self):
@@ -32,6 +32,10 @@ class ConfusionMatrix():
         while dist < self.horizon:
             dist += self.gap
             self.markers.append(dist)
+
+    def add_conf_matrix(self, new_conf_matrix):
+        for key in new_conf_matrix.keys():
+            self.C[key] += new_conf_matrix[key]
 
     def add_prediction(self, distance_bin, true_class, predicted_class):
         predicted_label = self.reverse_map[predicted_class]
@@ -103,9 +107,12 @@ def process_objects_detected(C, objects_detected, category_map):
             # index, marker = C.find_distance_bin(distance_to_ego)
             if box["yolo_match"]:
                 predicted_class = box["yolo_match"]["pred_class"]
-                detection = [predicted_class, true_class, distance_to_ego]
-                C.process_detections(detection) # Adding to confusion matrix
-    return C
+            else:
+                predicted_class = "empty"
+            detection = [predicted_class, true_class, distance_to_ego]
+            C.process_detections(detection) # Adding to confusion matrix
+
+
 
 if __name__ == '__main__':
     categories = []
@@ -117,7 +124,7 @@ if __name__ == '__main__':
     classes = ["pedestrian", "obstacle", "vehicle"]
     distance_bins = 5
     C = ConfusionMatrix(classes, distance_bins)
-
+    print(C.C)
     Nscenes = len(nusc.scene)
     for n in range(1,Nscenes+1):
         scene = nusc.scene[n-1]
@@ -125,9 +132,9 @@ if __name__ == '__main__':
         with (open(fname, "rb")) as openfile:
             try:
                 objects_detected = pkl.load(openfile)
-                C = process_objects_detected(C, objects_detected, sup_categories)
-                print(C.C)
-                pdb.set_trace()
+                process_objects_detected(C, objects_detected, sup_categories)
             except EOFError:
                 print("Error opening file")
                 break
+    pdb.set_trace()
+    print(C.C)
