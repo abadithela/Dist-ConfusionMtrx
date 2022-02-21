@@ -7,16 +7,15 @@ nusc = NuScenes(dataroot="/Users/apurvabadithela/Documents/software/nuscenes/dat
 import numpy as np
 cwd = os.getcwd()
 dirname = cwd + "/matchings_new"
-import pdb
 
 class ConfusionMatrix():
-    def __init__(self, classes, distance_bin=4):
+    def __init__(self, classes, distance_bin=5):
         self.distance_bins = distance_bins # Number of different splits within a total of 100 m
         self.horizon = 100.0
         self.create_distance_markers() # Upper bound for each confusion matrix
         self.C = dict()
-        for i in range(self.distance_bins):
-            self.C[i] = np.zeros(len(classes)+1)
+        for i in range(self.distance_bins+1):
+            self.C[i] = np.zeros((len(classes)+1, len(classes)+1))
 
         self.classes = classes
         self.map = dict()
@@ -27,7 +26,7 @@ class ConfusionMatrix():
         self.reverse_map = {v: k for k, v in self.map.items()}
 
     def create_distance_markers(self):
-        self.markers = []
+        self.markers = [0.0]
         self.gap = self.horizon/self.distance_bins
         dist = 0.0
         while dist < self.horizon:
@@ -40,16 +39,26 @@ class ConfusionMatrix():
         self.C[distance_bin][predicted_label, true_label] += 1
 
     def find_distance_bin(self, distance_to_ego):
+        bin = None
+        marker = None
         for i in range(1, len(self.markers)):
             if distance_to_ego < self.markers[i] and distance_to_ego >= self.markers[i-1]:
-                return i-1, self.markers[i-1]
+                bin = i-1
+                marker = self.markers[i-1]
+
+        if distance_to_ego >= self.markers[len(self.markers)-1]:
+            bin = len(self.markers) - 1
+            marker = self.markers[bin]
+        return bin, marker
 
     def process_detections(self, detection):
         prediction_class = detection[0]
         true_class = detection[1]
         distance_to_ego = detection[2]
-        distance_bin = self.find_distance_bin(distance_to_ego)
-        self.add_prediction(distance_bin, true_class, predicted_class)
+        distance_bin, marker = self.find_distance_bin(distance_to_ego)
+        # if distance_bin == 5:
+        #     pdb.set_trace()
+        self.add_prediction(distance_bin, true_class, prediction_class)
 
     def compute_true_pos(self, conf_mat_indx):
         conf_matrix = self.C[conf_mat_indx].copy()
@@ -96,6 +105,7 @@ def process_objects_detected(C, objects_detected, category_map):
                 predicted_class = box["yolo_match"]["pred_class"]
                 detection = [predicted_class, true_class, distance_to_ego]
                 C.process_detections(detection) # Adding to confusion matrix
+    return C
 
 if __name__ == '__main__':
     categories = []
@@ -105,7 +115,7 @@ if __name__ == '__main__':
             categories.append(cat_name)
     sup_categories = cluster_categories(categories)
     classes = ["pedestrian", "obstacle", "vehicle"]
-    distance_bins = 4
+    distance_bins = 5
     C = ConfusionMatrix(classes, distance_bins)
 
     Nscenes = len(nusc.scene)
@@ -115,9 +125,9 @@ if __name__ == '__main__':
         with (open(fname, "rb")) as openfile:
             try:
                 objects_detected = pkl.load(openfile)
-                process_objects_detected(C, objects_detected, sup_categories)
+                C = process_objects_detected(C, objects_detected, sup_categories)
+                print(C.C)
                 pdb.set_trace()
-
             except EOFError:
                 print("Error opening file")
                 break
