@@ -5,11 +5,12 @@ import pdb
 from utils import *
 dataroot="/Users/apurvabadithela/Documents/software/nuscenes/data/sets/nuscenes"
 from nuscenes.nuscenes import NuScenes, NuScenesExplorer
-from yolo_bboxes import *
+from yolo_bboxes_nusc_large import *
 from shapely.geometry import MultiPoint, box
 import pickle as pkl
 import numpy as np
-nusc = NuScenes(dataroot="/Users/apurvabadithela/Documents/software/nuscenes/data/sets/nuscenes/")
+dataroot="/Users/apurvabadithela/data/sets/nuscenes"
+nusc = NuScenes(version = 'v1.0-trainval', dataroot=dataroot)
 namesfile = 'data/coco.names'
 ### Load the COCO object classes
 class_names = load_class_names(namesfile)
@@ -174,6 +175,7 @@ for n in range(1,Nscenes+1):
 
         # Compare bounding boxes:
         matchings, matched_gt_boxes, matched_yolo_boxes = compare_boxes(boxes_gt_pixels, boxes_yolo_pixels)
+
         # compute distance from ego to annotations:
 
         # Plot boxes on single image:
@@ -218,9 +220,16 @@ for n in range(1,Nscenes+1):
     # pdb.set_trace()
     # Save data:
     cwd = os.getcwd()
-    dirname = cwd + "/matchings_new"
+    dirname = cwd + "/large_matchings_nuscenes"
     # pdb.set_trace()
     if os.path.exists(dirname) is False:
         os.mkdir(dirname)
     fname = dirname + "/scene_"+str(n)+"_matchings.p"
     pkl.dump(objects_detected, open(fname, "wb"))
+
+# Draw 2D boxes:
+# data_path, boxes, camera_intrinsic = nusc.get_sample_data(cam_front_data_f['token'], box_vis_level=BoxVisibility.ANY)
+# ax = None
+# if ax is None:
+#     _, ax = plt.subplots(1, 1, figsize=(9, 16))
+# im = plot_nusc_bboxes_2D(data_path, camera_intrinsic, boxes, imsize, ax=ax)

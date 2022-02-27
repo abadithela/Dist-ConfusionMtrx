@@ -4,14 +4,15 @@ import os
 import pickle as pkl
 from nuscenes.nuscenes import NuScenes, NuScenesExplorer
 nusc = NuScenes(dataroot="/Users/apurvabadithela/Documents/software/nuscenes/data/sets/nuscenes/")
+from tabulate import tabulate
 import numpy as np
 cwd = os.getcwd()
 dirname = cwd + "/matchings_new"
 
 class ConfusionMatrix():
-    def __init__(self, classes, distance_bin=5):
+    def __init__(self, classes, horizon, distance_bins=5):
         self.distance_bins = distance_bins # Number of different splits within a total of 100 m
-        self.horizon = 100.0
+        self.horizon = horizon
         self.create_distance_markers() # Upper bound for each confusion matrix
         self.C = dict()
         for i in range(self.distance_bins+1):
@@ -64,13 +65,16 @@ class ConfusionMatrix():
         #     pdb.set_trace()
         self.add_prediction(distance_bin, true_class, prediction_class)
 
-    def compute_true_pos(self, conf_mat_indx):
-        conf_matrix = self.C[conf_mat_indx].copy()
-        pass
-
-    # def compute_true_neg(self, class, conf_mat_indx):
+    # def compute_true_pos(self, conf_mat_indx):
     #     conf_matrix = self.C[conf_mat_indx].copy()
     #     pass
+    #
+    # def compute_true_neg(self, class, conf_mat_indx):
+    #     conf_matrix = self.C[conf_mat_indx].copy()
+    #     corr_pred = conf_matrix[class,class]
+    #     incorr_pred = sum(conf_matrix[:,class]) - corr_pred
+    #     tp = corr_pred/(incorr_pred + corr_pred)
+    #     return tp
     #
     # def compute_false_neg(self, class, conf_mat_indx):
     #     conf_matrix = self.C[conf_mat_indx].copy()
@@ -81,9 +85,23 @@ class ConfusionMatrix():
     #     pass
 
     def print(self):
+        # for i in range(self.distance_bins):
+        #     print(" ")
+        #     print("Printing confusion matrix from distance d <= {0}".format(self.markers[i]))
+        #     ped_pred = list(self.C[i][0,:])
+        #     veh_pred = list(self.C[i][1,:])
+        #     obs_pred = list(self.C[i][2,:])
+        #     emp_pred = list(self.C[i][3,:])
+        #     table_C = tabulate([['pedestrian', *ped_pred], ['vehicle', *veh_pred], ['obstacle', *obs_pred], ['empty', *emp_pred]], headers=['pred \ true', 'pedestrian', 'vehicle', 'obstacle', 'empty'])
+        #     print(table_C)
         for i in range(self.distance_bins):
+            print(" ")
             print("Printing confusion matrix from distance d <= {0}".format(self.markers[i]))
-            print(self.C[i])
+            ped_pred = list(self.C[i][0,:])
+            obs_pred = list(self.C[i][1,:])
+            emp_pred = list(self.C[i][2,:])
+            table_C = tabulate([['pedestrian', *ped_pred], ['obstacle', *obs_pred], ['empty', *emp_pred]], headers=['pred \ true', 'pedestrian', 'obstacle', 'empty'])
+            print(table_C)
 
 # Returns a map to categories of the confusion matrix
 def cluster_categories(categories):
@@ -92,7 +110,7 @@ def cluster_categories(categories):
         if "human" in category and category not in sup_categories.keys():
             sup_categories[category] = "pedestrian"
         elif "vehicle" in category and category not in sup_categories.keys():
-            sup_categories[category] = "vehicle"
+            sup_categories[category] = "obstacle"
         else:
             if category not in sup_categories.keys():
                 sup_categories[category] = "obstacle"
@@ -121,10 +139,9 @@ if __name__ == '__main__':
         if cat_name not in categories:
             categories.append(cat_name)
     sup_categories = cluster_categories(categories)
-    classes = ["pedestrian", "obstacle", "vehicle"]
+    classes = ["pedestrian",  "vehicle", "obstacle"]
     distance_bins = 5
     C = ConfusionMatrix(classes, distance_bins)
-    print(C.C)
     Nscenes = len(nusc.scene)
     for n in range(1,Nscenes+1):
         scene = nusc.scene[n-1]
@@ -133,8 +150,9 @@ if __name__ == '__main__':
             try:
                 objects_detected = pkl.load(openfile)
                 process_objects_detected(C, objects_detected, sup_categories)
+                print(C.C)
             except EOFError:
                 print("Error opening file")
                 break
+    print("Finished computing confusion matrix")
     pdb.set_trace()
-    print(C.C)

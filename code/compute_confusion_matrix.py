@@ -18,6 +18,8 @@ iou_thresh = 0.4
 
 sensor = 'CAM_FRONT' # Sensor rleevant in this study
 PLOT = True
+horizon = 120
+discrete_horizon = 5
 
 # Helper function only to read front camera annotations:
 # Get annotations only on camera front:
@@ -72,7 +74,7 @@ def get_yolo_boxes(yolo, data_path):
     boxes, boxes_pixels_yolo = yolo.yolo(data_path)
     return boxes, boxes_pixels_yolo
 
-# function to get nuscenes boxes:
+# Function to get nuscenes boxes:
 def get_gt_boxes(sample):
     # Get front camera data:
     cam_front_data_f = nusc.get('sample_data', sample['data'][sensor])
@@ -91,7 +93,66 @@ def prepare_gt_box(nubox):
     new_nusc_box = [xmin, ymin, xmax-xmin, ymin-ymax]
     return new_nusc_box
 
+# Finding tp, fp and fn detections:
+def matching_metrics(boxes_gt, boxes_yolo_pixels):
+    matching_metrics = {}
+    boxes_gt_dict = {}
+    boxes_yolo_dict = {}
+    i = 0
+    for box_gt in boxes_gt:
+        boxes_gt_dict[i] = prepare_gt_box(box_gt)
+        matching_metrics[i] = dict()
+        matching_metrics[i]["tp"] = []
+        matching_metrics[i]["fp"] = []
+        matching_metrics[i]["fn"] = []
+        i += 1
+    i= 0
+    for box_yolo in boxes_yolo_pixels:
+        boxes_yolo_dict[i] = prepare_yolo_box(box_yolo)
+        i += 1
+
+    for box_gt_i in boxes_gt_dict.keys():
+        true_positive_detections = False
+        false_positive_detections = False
+        false_negative_detections = False
+        for box_yolo_i in boxes_yolo_dict.keys():
+            box_gt = boxes_gt_dict[box_gt_i]
+            box_yolo = boxes_yolo_dict[box_yolo_i]
+            # box_yolo = prepare_yolo_box(box_yolo)
+            # box_gt = prepare_gt_box(box_gt)
+            iou = compute_iou(box_gt, box_yolo)
+            if iou >= 0.7:
+                true_positive_detections = True
+            elif iou > 0.0 and iou < 0.7:
+                false_positive_detections = True
+
+        if true_positive_detections == False and false_positive_detections == False:
+            false_negative_detections = True
+        matching_metrics[i]["tp"] = true_positive_detections.copy()
+        matching_metrics[i]["fp"] = false_positive_detections.copy()
+        matching_metrics[i]["fn"] = false_negative_detections
+        return matching_metrics
+
+# Compute confusion matrix over distance for a given scene
+# Including classification false positives and false negatives
+def compute_confusion_matrix(boxes_nusc, distance_to_ego, matching_metrics, matchings):
+    discretization = np.linspace(discrete_horizon, horizon, horizon/discrete_horizon)
+    confusion_matrix = {i: None for i in discretization} # distionary of confusion matrix by distance
+    i = 0
+    TRUE_POS = {i: {"pedestrian": None, "obstacle": None, "vehicle": None, "empty": None} for i in discretization}
+    for box_token, d in distance_to_ego.items():
+        dindx = np.where(d < discretization)[0][0] # First index
+
+        true_pos = matching_metrics[i]["tp"]
+        false_pos = matching_metrics[i]["fp"]
+        false_neg = matching_metrics[i]["fn"]
+        true_class = matchings[i]["category"]
+        if true_pos:
+            pred_class = matchings[i]["yolo_match"]["pred_class"]
+
+        i += 1
 # Compare boxes:
+# Object detection true positives, false positives and false negatives
 def compare_boxes(boxes_gt, boxes_yolo_pixels):
     matchings = {}
     matched_nusc_boxes = []
@@ -110,6 +171,9 @@ def compare_boxes(boxes_gt, boxes_yolo_pixels):
         i += 1
 
     for box_gt_i in boxes_gt_dict.keys():
+        true_positive_detections = []
+        false_positive_detections = []
+        false_negative_detections = []
         for box_yolo_i in boxes_yolo_dict.keys():
             box_gt = boxes_gt_dict[box_gt_i]
             box_yolo = boxes_yolo_dict[box_yolo_i]
@@ -123,6 +187,11 @@ def compare_boxes(boxes_gt, boxes_yolo_pixels):
                 matched_yolo_boxes.append(boxes_yolo_dict[box_yolo_i])
                 #matchings[box_gt_i]["yolo_match"]["pred_category"] = get_yolo_object_type(boxes_yolo_pixels[box_yolo_i])
                 print("Match found")
+
+            elif iou > 0.0 and iou < 0.7:
+                matchings[box_gt_i]["yolo_match"]["box_id"] = box_yolo_i
+                matched_nusc_boxes.append(boxes_gt_dict[box_gt_i])
+                matched_yolo_boxes.append(boxes_yolo_dict[box_yolo_i])
     return matchings, matched_nusc_boxes, matched_yolo_boxes
 
 # Compute distance to ego
@@ -176,21 +245,9 @@ for n in range(1,Nscenes+1):
         matchings, matched_gt_boxes, matched_yolo_boxes = compare_boxes(boxes_gt_pixels, boxes_yolo_pixels)
         # compute distance from ego to annotations:
 
-        # Plot boxes on single image:
-        # plot only matched boxes
-        if PLOT:
-            prepped_gt_boxes = [prepare_gt_box(box) for box in matched_gt_boxes]
-            prepped_yolo_boxes = [prepare_yolo_box(box) for box in matched_yolo_boxes]
-            # pdb.set_trace()
-            # Plot matched boxes
-            fname_configs = {'scene_number': n, 'sample_number': sample_number}
-            plot_boxes_both(matched_gt_boxes, matched_yolo_boxes, data_path, cam_data, fname_configs)
-
-            # Plot all 2D nuscenes boxes:
-            plot_nusc_bboxes_2D(data_path, camera_intrinsic, boxes_nusc, fname_configs)
-
         # Distance to ego:
         distance_to_annotations = compute_distance_to_ego(boxes_nusc, cam_data)
+        metrics = matching_metrics(boxes_gt_pixels, boxes_yolo_pixels)
 
         # Add annotations:
         for j in range(len(boxes_nusc)):
@@ -224,3 +281,10 @@ for n in range(1,Nscenes+1):
         os.mkdir(dirname)
     fname = dirname + "/scene_"+str(n)+"_matchings.p"
     pkl.dump(objects_detected, open(fname, "wb"))
+
+# Draw 2D boxes:
+# data_path, boxes, camera_intrinsic = nusc.get_sample_data(cam_front_data_f['token'], box_vis_level=BoxVisibility.ANY)
+# ax = None
+# if ax is None:
+#     _, ax = plt.subplots(1, 1, figsize=(9, 16))
+# im = plot_nusc_bboxes_2D(data_path, camera_intrinsic, boxes, imsize, ax=ax)

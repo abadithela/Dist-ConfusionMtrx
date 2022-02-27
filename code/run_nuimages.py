@@ -5,7 +5,7 @@ import pdb
 from utils import *
 dataroot="/Users/apurvabadithela/Documents/software/nuimenes/data/sets/nuimenes"
 from nuimages.nuimages import NuImages
-from yolo_bboxes import *
+from yolo_bboxes_nuimages import *
 from shapely.geometry import MultiPoint, box
 import pickle as pkl
 import numpy as np
