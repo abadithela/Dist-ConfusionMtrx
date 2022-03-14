@@ -305,7 +305,7 @@ if __name__ == '__main__':
         pkl.dump(objects_detected, open(fname, "wb"))
     # pdb.set_trace()
     # Print confusion matrix:
-    # C.print()
+    C.print()
     dirname = cwd + "/nusc_mini"
     fname = dirname + "param_conf_matrix.p"
     pkl.dump(C, open(fname, "wb"))
