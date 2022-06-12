@@ -70,7 +70,6 @@ rev_cm_class_dict = {tuple(v): k for k, v in cm_class_dict.items()}
 
 print(rev_cm_class_dict)
 
-
 # Cluster categories from nuscenes dataset:
 categories = []
 for category_dict in nusc.category:
@@ -268,57 +267,57 @@ if __name__ == '__main__':
     for n in range(1,Nscenes+1):
         fname = dirname + "/scene_"+str(n)+"_matchings.p"
         if chk_stored_scenes and os.path.exists(fname) is False:
-        print("Iteration ........ ", str(n))
-        objects_detected = dict() # Matchings over objects detected
-        scene = nusc.scene[n-1]
-        # iterating over timestamps / samples:
-        sample_token = scene['first_sample_token']
-        sample = nusc.get('sample', scene['first_sample_token'])
-        sample_number = 1
+            print("Iteration ........ ", str(n))
+            objects_detected = dict() # Matchings over objects detected
+            scene = nusc.scene[n-1]
+            # iterating over timestamps / samples:
+            sample_token = scene['first_sample_token']
+            sample = nusc.get('sample', scene['first_sample_token'])
+            sample_number = 1
 
-        while sample_number < scene['nbr_samples']:
-            # Get ground truth 2D boxes for front camera:
-            print("Getting Nuscenes ground truth 2D boxes: ")
-            boxes_gt_pixels, boxes_nusc, data_path, cam_data, camera_intrinsic = get_gt_boxes(sample)
-            # Get Yolo Boxes:
-            print("Getting YoLo predicted 2D boxes: ")
-            boxes_yolo, boxes_yolo_pixels = get_yolo_boxes(yolo, data_path)
+            while sample_number < scene['nbr_samples']:
+                # Get ground truth 2D boxes for front camera:
+                print("Getting Nuscenes ground truth 2D boxes: ")
+                boxes_gt_pixels, boxes_nusc, data_path, cam_data, camera_intrinsic = get_gt_boxes(sample)
+                # Get Yolo Boxes:
+                print("Getting YoLo predicted 2D boxes: ")
+                boxes_yolo, boxes_yolo_pixels = get_yolo_boxes(yolo, data_path)
 
-            # Compare bounding boxes:
-            matchings, matched_gt_boxes, matched_yolo_boxes = compare_boxes(boxes_gt_pixels, boxes_yolo_pixels)
-            # compute distance from ego to annotations:
+                # Compare bounding boxes:
+                matchings, matched_gt_boxes, matched_yolo_boxes = compare_boxes(boxes_gt_pixels, boxes_yolo_pixels)
+                # compute distance from ego to annotations:
 
-            distance_to_annotations = compute_distance_to_ego(boxes_nusc, cam_data)
+                distance_to_annotations = compute_distance_to_ego(boxes_nusc, cam_data)
 
-            # Add annotations:
-            for j in range(len(boxes_nusc)):
-                nubox = boxes_nusc[j] # Box object
-                matchings[j]['nusc_token'] = nubox.token
-                matchings[j]['distance_to_ego'] = distance_to_annotations[nubox.token] # Distance to ego
-                matchings[j]['category'] = nubox.name
+                # Add annotations:
+                for j in range(len(boxes_nusc)):
+                    nubox = boxes_nusc[j] # Box object
+                    matchings[j]['nusc_token'] = nubox.token
+                    matchings[j]['distance_to_ego'] = distance_to_annotations[nubox.token] # Distance to ego
+                    matchings[j]['category'] = nubox.name
 
-                if matchings[j]["yolo_match"]:
-                    yolo_id = matchings[j]["yolo_match"]["box_id"]
-                    yolo_box_id = boxes_yolo[yolo_id]
-                    if class_names[yolo_box_id[6]] in ["car", "truck", "bus"]:
-                        matchings[j]["yolo_match"]["pred_class"] = "obstacle"
-                    elif class_names[yolo_box_id[6]] == "person":
-                        matchings[j]["yolo_match"]["pred_class"] = "pedestrian"
-                    else:
-                        matchings[j]["yolo_match"]["pred_class"] = "obstacle"
+                    if matchings[j]["yolo_match"]:
+                        yolo_id = matchings[j]["yolo_match"]["box_id"]
+                        yolo_box_id = boxes_yolo[yolo_id]
+                        if class_names[yolo_box_id[6]] in ["car", "truck", "bus"]:
+                            matchings[j]["yolo_match"]["pred_class"] = "obstacle"
+                        elif class_names[yolo_box_id[6]] == "person":
+                            matchings[j]["yolo_match"]["pred_class"] = "pedestrian"
+                        else:
+                            matchings[j]["yolo_match"]["pred_class"] = "obstacle"
 
-            # Construct confusion matrix for this scene:
-            scene_cm = scene_confusion_matrix(distance_to_annotations, matchings, boxes_nusc)
-            C.add_conf_matrix(scene_cm)
-            # Store all matchings at the end
-            objects_detected[sample_number] = matchings
-            # Update sample number:
-            sample_token = sample['next']
-            sample = nusc.get('sample', sample_token)
-            sample_number += 1
+                # Construct confusion matrix for this scene:
+                scene_cm = scene_confusion_matrix(distance_to_annotations, matchings, boxes_nusc)
+                C.add_conf_matrix(scene_cm)
+                # Store all matchings at the end
+                objects_detected[sample_number] = matchings
+                # Update sample number:
+                sample_token = sample['next']
+                sample = nusc.get('sample', sample_token)
+                sample_number += 1
 
-        # Save data:
-        pkl.dump(objects_detected, open(fname, "wb"))
+            # Save data:
+            pkl.dump(objects_detected, open(fname, "wb"))
 
     # Print confusion matrix:
     C.print_cm()
