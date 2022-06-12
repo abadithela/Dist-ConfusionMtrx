@@ -3,11 +3,21 @@ import pdb
 import os
 import pickle as pkl
 from nuscenes.nuscenes import NuScenes, NuScenesExplorer
-nusc = NuScenes(dataroot="/Users/apurvabadithela/Documents/software/nuscenes/data/sets/nuscenes/")
-from tabulate import tabulate
+dataroot="/Users/apurvabadithela/Documents/software/nuscenes/data/sets/nuscenes/"
 import numpy as np
-cwd = os.getcwd()
-dirname = cwd + "/matchings_new"
+dataroot_ext = "/Volumes/Extreme SSD/nuscenes"
+traindir="trainval126"
+save_data_ext = True
+if save_data_ext:
+    nusc = NuScenes(version='v1.0-trainval', dataroot=dataroot_ext)
+    dirname = "/Volumes/Extreme SSD/cm_processing/" + traindir + "/matchings"
+else:
+    nusc = NuScenes(dataroot=dataroot)
+    cwd = os.getcwd()
+    dirname = cwd + "/matchings_new"
+import texttable
+from tabulate import tabulate
+import latextable
 
 class ConfusionMatrix():
     def __init__(self, classes, horizon, distance_bins=5):
@@ -23,11 +33,11 @@ class ConfusionMatrix():
         for k in range(len(classes)):
             self.map[k] = classes[k]
         self.classes.append("no detection")
-        self.map[len(classes)-1] = "empty"
+        self.map[len(classes)-1] = ("empty",)
         self.reverse_map = {v: k for k, v in self.map.items()}
 
     def create_distance_markers(self):
-        self.markers = [0.0]
+        self.markers = []
         self.gap = self.horizon/self.distance_bins
         dist = 0.0
         while dist < self.horizon:
@@ -44,17 +54,17 @@ class ConfusionMatrix():
         self.C[distance_bin][predicted_label, true_label] += 1
 
     def find_distance_bin(self, distance_to_ego):
-        bin = None
+        bin_name = None
         marker = None
         for i in range(1, len(self.markers)):
             if distance_to_ego < self.markers[i] and distance_to_ego >= self.markers[i-1]:
-                bin = i-1
+                bin_name = i-1
                 marker = self.markers[i-1]
 
         if distance_to_ego >= self.markers[len(self.markers)-1]:
-            bin = len(self.markers) - 1
-            marker = self.markers[bin]
-        return bin, marker
+            bin_name = len(self.markers) - 1
+            marker = self.markers[bin_name]
+        return bin_name, marker
 
     def process_detections(self, detection):
         prediction_class = detection[0]
@@ -84,23 +94,21 @@ class ConfusionMatrix():
     #     conf_matrix = self.C[conf_mat_indx].copy()
     #     pass
 
-    def print(self):
-        # for i in range(self.distance_bins):
-        #     print(" ")
-        #     print("Printing confusion matrix from distance d <= {0}".format(self.markers[i]))
-        #     ped_pred = list(self.C[i][0,:])
-        #     veh_pred = list(self.C[i][1,:])
-        #     obs_pred = list(self.C[i][2,:])
-        #     emp_pred = list(self.C[i][3,:])
-        #     table_C = tabulate([['pedestrian', *ped_pred], ['vehicle', *veh_pred], ['obstacle', *obs_pred], ['empty', *emp_pred]], headers=['pred \ true', 'pedestrian', 'vehicle', 'obstacle', 'empty'])
-        #     print(table_C)
+    def print_cm(self):
+        # TO-DO: make it generic
         for i in range(self.distance_bins):
             print(" ")
+            headers=['']
+            predictions = []
+            for k,v in self.map.items():
+                headers.append(v)
+                pred_class = v
+                pred_row = list(self.C[i][k,:])
+                predictions.append([pred_class, *pred_row])
+
             print("Printing confusion matrix from distance d <= {0}".format(self.markers[i]))
-            ped_pred = list(self.C[i][0,:])
-            obs_pred = list(self.C[i][1,:])
-            emp_pred = list(self.C[i][2,:])
-            table_C = tabulate([['pedestrian', *ped_pred], ['obstacle', *obs_pred], ['empty', *emp_pred]], headers=['pred \ true', 'pedestrian', 'obstacle', 'empty'])
+
+            table_C = tabulate(predictions, headers=headers, tablefmt='latex')
             print(table_C)
 
 # Returns a map to categories of the confusion matrix
@@ -126,7 +134,7 @@ def process_objects_detected(C, objects_detected, category_map):
             if box["yolo_match"]:
                 predicted_class = box["yolo_match"]["pred_class"]
             else:
-                predicted_class = "empty"
+                predicted_class = ("empty",)
             detection = [predicted_class, true_class, distance_to_ego]
             C.process_detections(detection) # Adding to confusion matrix
 
@@ -141,7 +149,7 @@ if __name__ == '__main__':
     sup_categories = cluster_categories(categories)
     classes = ["pedestrian",  "vehicle", "obstacle"]
     distance_bins = 5
-    C = ConfusionMatrix(classes, distance_bins)
+    C = ConfusionMatrix(classes, horizon, distance_bins)
     Nscenes = len(nusc.scene)
     for n in range(1,Nscenes+1):
         scene = nusc.scene[n-1]

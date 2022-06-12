@@ -149,8 +149,8 @@ def compute_confusion_matrix(boxes_nusc, distance_to_ego, matching_metrics, matc
         true_class = matchings[i]["category"]
         if true_pos:
             pred_class = matchings[i]["yolo_match"]["pred_class"]
-
         i += 1
+        
 # Compare boxes:
 # Object detection true positives, false positives and false negatives
 def compare_boxes(boxes_gt, boxes_yolo_pixels):

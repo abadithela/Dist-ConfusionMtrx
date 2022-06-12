@@ -1,30 +1,77 @@
-## Apurva Badithela
-# File to run nuscenes scenarios
-# Confusion matrix computed according to paper
+# Proposition based distance parametrized confusion matrices
+# Apurva Badithela
+# 6/7/22
+
 import os
 import pdb
 from utils import *
 dataroot="/Users/apurvabadithela/Documents/software/nuscenes/data/sets/nuscenes"
+dataroot_ext = "/Volumes/Extreme SSD/nuscenes"
+traindir="trainval126"
 from nuscenes.nuscenes import NuScenes, NuScenesExplorer
 from yolo_bboxes import *
 from shapely.geometry import MultiPoint, box
 import pickle as pkl
 from parse_matchings import ConfusionMatrix, cluster_categories
 import numpy as np
-
-nusc = NuScenes(dataroot="/Users/apurvabadithela/Documents/software/nuscenes/data/sets/nuscenes/")
+from itertools import chain, combinations
 namesfile = 'data/coco.names'
+save_data_ext = True # parameter to save on external ssd
+chk_stored_scenes = True # parameter to not resolve for already solved scenes
+if save_data_ext:
+    nusc = NuScenes(version='v1.0-trainval', dataroot=dataroot_ext)
+else:
+    nusc = NuScenes(dataroot=dataroot)
+# ======================================================================== #
 ### Load the COCO object classes
 class_names = load_class_names(namesfile)
+cm_type = "prop_based"
 nms_thresh = 0.6
 iou_thresh = 0.4
 horizon = 120
 discrete_horizon = 5
 sensor = 'CAM_FRONT' # Sensor rleevant in this study
 PLOT = True
-Nclasses = 3
 
-# Cluster categories:
+# Get number of classes in the confusion matrix:
+# Nclasses: num of different objects
+# Nprops: num of different confusion matrices
+class_dict = {0: 'pedestrian', 1:'obstacle', 2:'empty'}
+n = len(list(class_dict.keys()))
+def get_nclasses(Nclasses):
+    if cm_type == "prop_based":
+        return 2**(Nclasses-1)
+    else:
+        return Nclasses
+
+Nclasses = get_nclasses(n)
+
+def powerset(iterable):
+    "powerset([1,2,3]) --> (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
+    s = list(iterable)
+    return chain.from_iterable(combinations(s, r) for r in range(1, len(s)+1))
+
+cm_class_dict = dict()
+cm_class_dict[Nclasses-1] = {'empty'} # Building an order
+key = 0
+empty_key = [k for k,v in class_dict.items() if v == 'empty'][0] # There should only be one empty key
+class_keys = list(class_dict.keys())[:-1] # Fix; make better
+cm_classes_keys = list(powerset(class_keys))
+
+for k in range(len(cm_classes_keys)):
+    class_combinations = cm_classes_keys[k]
+    cm_class_dict[k] = {class_dict[class_combinations[0]]}
+    for l in range(1, len(class_combinations)):
+        cm_class_dict[k] |= {class_dict[class_combinations[l]]}
+
+print(cm_class_dict)
+rev_class_dict = {v: k for k, v in class_dict.items()}
+rev_cm_class_dict = {tuple(v): k for k, v in cm_class_dict.items()}
+
+print(rev_cm_class_dict)
+
+
+# Cluster categories from nuscenes dataset:
 categories = []
 for category_dict in nusc.category:
     cat_name = category_dict['name']
@@ -32,46 +79,7 @@ for category_dict in nusc.category:
         categories.append(cat_name)
 sup_categories = cluster_categories(categories)
 
-# Helper function only to read front camera annotations:
-# Get annotations only on camera front:
-def is_cam_front_ann_token(anntoken: str,
-                      margin: float = 10,
-                      view: np.ndarray = np.eye(4),
-                      box_vis_level: BoxVisibility = BoxVisibility.ANY,
-                      out_path: str = None,
-                      extra_info: bool = False) -> None:
-    """
-    Render selected annotation.
-    :param anntoken: Sample_annotation token.
-    :param margin: How many meters in each direction to include in LIDAR view.
-    :param view: LIDAR view point.
-    :param box_vis_level: If sample_data is an image, this sets required visibility for boxes.
-    :param out_path: Optional path to save the rendered figure to disk.
-    :param extra_info: Whether to render extra information below camera view.
-    """
-    ann_record = nusc.get('sample_annotation', anntoken)
-    sample_record = nusc.get('sample', ann_record['sample_token'])
-    assert 'LIDAR_TOP' in sample_record['data'].keys(), 'Error: No LIDAR_TOP in data, unable to render.'
-
-    # Figure out which camera the object is fully visible in (this may return nothing).
-    boxes, cam = [], []
-    cams = [key for key in sample_record['data'].keys() if 'CAM' in key]
-    for cam in cams:
-        _, boxes, _ = nusc.get_sample_data(sample_record['data'][cam], box_vis_level=box_vis_level,
-                                                selected_anntokens=[anntoken])
-        if len(boxes) > 0:
-            break  # We found an image that matches. Let's abort.
-    assert len(boxes) > 0, 'Error: Could not find image where annotation is visible. ' \
-                           'Try using e.g. BoxVisibility.ANY.'
-    assert len(boxes) < 2, 'Error: Found multiple annotations. Something is wrong!'
-
-    cam = sample_record['data'][cam]
-    view = nusc.get('sample_data', cam)['channel']
-    if view == 'CAM_FRONT':
-        return True
-    else:
-        return False
-
+# ==================================================================== #
 # Collect all instances captured in the first annotation of the object:
 def get_yolo_object_type(box, class_names):
     # print('Objects Found and Confidence Level:\n')
@@ -104,7 +112,9 @@ def prepare_gt_box(nubox):
     new_nusc_box = [xmin, ymin, xmax-xmin, ymin-ymax]
     return new_nusc_box
 
+# ==================================================================== #
 # Compare boxes:
+# To-DO: Cleanup code
 def compare_boxes(boxes_gt, boxes_yolo_pixels):
     matchings = {}
     matched_nusc_boxes = []
@@ -126,8 +136,6 @@ def compare_boxes(boxes_gt, boxes_yolo_pixels):
         for box_yolo_i in boxes_yolo_dict.keys():
             box_gt = boxes_gt_dict[box_gt_i]
             box_yolo = boxes_yolo_dict[box_yolo_i]
-            # box_yolo = prepare_yolo_box(box_yolo)
-            # box_gt = prepare_gt_box(box_gt)
             iou = compute_iou(box_gt, box_yolo)
 
             if iou >= 0.7:
@@ -137,59 +145,57 @@ def compare_boxes(boxes_gt, boxes_yolo_pixels):
                 print("Match found")
     return matchings, matched_nusc_boxes, matched_yolo_boxes
 
+# ==================================================================== #
 # process list of observations seen at a distance j:
-# ann_at_j is a list of predictions for the ground truth annotation, gt_ann at the same distance in a single image
-def process_anns_at_j(prediction, gt_ann, scene_cmi):
-    assert prediction!=[]
-    # class_dict = {0: 'pedestrian', 1:'vehicle', 2:'obstacle', 3:'empty'}
-    class_dict = {0: 'pedestrian', 1:'obstacle', 2:'empty'}
-    rev_class_dict = {v: k for k, v in class_dict.items()}
-    correctly_predicted = [gt_ann == p for p in prediction]
-    unique_predictions = list(set(prediction))
-    m = len(unique_predictions) # Number of predictions
-    if any(correctly_predicted):
-        row = rev_class_dict[gt_ann]
-        col = rev_class_dict[gt_ann]
-        scene_cmi[row, col] += 1
-    else:
-        for pred in unique_predictions:
-            row = rev_class_dict[pred]
-            col = rev_class_dict[gt_ann]
-            if m > 1:
-                pdb.set_trace()
-            scene_cmi[row, col] += 1.0/m
-    return scene_cmi
+# ann_at_j is a list of predictions for the ground truth annotation, gt_ann, at the same distance in a single image
 
+def process_anns_at_j(predictions, gt_val, scene_cmi):
+    predicted_prop = set(predictions)
+    true_prop = set(gt_val)
+    assert true_prop != {'empty'}
+
+    if 'empty' in true_prop:
+        true_prop.remove('empty')
+    if 'empty' in predicted_prop and predicted_prop != {'empty'}:
+        predicted_prop.remove('empty')
+
+    for k, v in rev_cm_class_dict.items():
+        if predicted_prop == set(k):
+            pred_idx = k
+        if true_prop == set(k):
+            true_idx = k
+
+    row = rev_cm_class_dict[pred_idx]
+    col = rev_cm_class_dict[true_idx]
+    # pdb.set_trace()
+    scene_cmi[row, col] += 1.0
+    return scene_cmi
+# ===========================================================================#
 # Function to construct the confusion matrix from the categorized annotations :
 def construct_confusion_matrix(scene_obj):
     discretization = np.linspace(discrete_horizon, horizon, int(horizon/discrete_horizon))
-    scene_cm = {i: np.zeros((Nclasses,Nclasses)) for i in range(len(discretization))} # distionary of confusion
+    scene_cm = {i: np.zeros((Nclasses, Nclasses)) for i in range(len(discretization))} # distionary of confusion
+
     # class_dict = {0: 'pedestrian', 1:'vehicle', 2:'obstacle', 3:'empty'}
-    class_dict = {0: 'pedestrian', 1:'obstacle', 2:'empty'}
-    rev_class_dict = {v: k for k, v in class_dict.items()}
     obj_det=False
+
+    # Discretization of the state space
     for i in range(len(discretization)):
         objs_at_dist_i = scene_obj[i]
         if objs_at_dist_i == []: # If no object at that distance return empty
-            true_class = 'empty'
-            pred_class = 'empty'
-            row = rev_class_dict[pred_class]
-            col = rev_class_dict[true_class]
+            true_class = tuple({'empty'})
+            pred_class = tuple({'empty'})
+            row = rev_cm_class_dict[pred_class]
+            col = rev_cm_class_dict[true_class]
             scene_cm[i][row, col] += 1
-
         else:
             obj_det = True
-            pred_ped = [obj[1] for obj in objs_at_dist_i if obj[0]=='pedestrian']
-            # pred_veh = [obj[1] for obj in objs_at_dist_i if obj[0]=='vehicle']
-            pred_obs = [obj[1] for obj in objs_at_dist_i if obj[0]=='obstacle']
-            if pred_ped:
-                scene_cm[i] = process_anns_at_j(pred_ped, 'pedestrian', scene_cm[i])
-            # if pred_veh:
-            #     scene_cm[i] = process_anns_at_j(pred_veh, 'vehicle', scene_cm[i])
-            if pred_obs:
-                scene_cm[i] = process_anns_at_j(pred_obs, 'obstacle', scene_cm[i])
+            predictions =  [obj[1] for obj in objs_at_dist_i]
+            gt_val =  [obj[0] for obj in objs_at_dist_i]
+            scene_cm[i] = process_anns_at_j(predictions, gt_val, scene_cm[i])
     return scene_cm
 
+# ===========================================================================#
 # Scene confusion matrix:
 # scene_cm is an N-by-N matrix where scene_cm(i,j) has the ith location of the
 def scene_confusion_matrix(distance_to_annotations, matchings, boxes_nusc):
@@ -206,10 +212,11 @@ def scene_confusion_matrix(distance_to_annotations, matchings, boxes_nusc):
                 pred_class = matchings[j]['yolo_match']['pred_class'] # Find the classified matching, otherwise empty
             else:
                 pred_class = 'empty'
-            scene_obj[dindx].append((true_class, pred_class))
+            scene_obj[dindx].append((true_class, pred_class)) # Scenario of all objects at a given distance from the ego
     scene_cm = construct_confusion_matrix(scene_obj)
     return scene_cm
 
+# =========================================================================== #
 # Compute distance to ego
 def compute_distance_to_ego(boxes_nusc, cam_data):
     sample_token = cam_data['token']
@@ -218,7 +225,7 @@ def compute_distance_to_ego(boxes_nusc, cam_data):
     curr_sample_record = nusc.get('sample', sd_record['sample_token'])
     curr_ann_recs = [nusc.get('sample_annotation', token) for token in curr_sample_record['anns']]
     cam_front_boxes_nusc = list([box.token for box in boxes_nusc])
-    cam_front_anns = [ann_rec for ann_rec in curr_ann_recs if curr_ann_recs in cam_front_boxes_nusc]# only look at front camera annotations:
+    cam_front_anns = [ann_rec for ann_rec in curr_ann_recs if curr_ann_recs in cam_front_boxes_nusc] # only look at front camera annotations:
     # Sanity check:
     assert cam_front_anns!=None
 
@@ -232,24 +239,38 @@ def compute_distance_to_ego(boxes_nusc, cam_data):
         distance_to_ego[box.token] = np.linalg.norm(box_pos)
     return distance_to_ego
 
+# =============================================================================#
 # Iterating over scenes
 # print(nusc.list_sample)
+def get_dirname():
+    if save_data_ext:
+        dirname = "/Volumes/Extreme SSD/cm_processing/" + traindir + "/matchings"
+    else:
+        cwd = os.getcwd()
+        dirname = cwd + "/matchings_new"
+        # pdb.set_trace()
+    if os.path.exists(dirname) is False:
+        os.mkdir(dirname)
+    return dirname
+
 if __name__ == '__main__':
-    classes = ["pedestrian",  "obstacle"]
-    horizon = 50
-    discrete_horizon = 2
+    classes = [tuple(c) for c in list(cm_class_dict.values()) if c!={'empty'}]
+    print(classes)
+    horizon = 100
+    discrete_horizon = 10
     distance_bins = int(horizon/discrete_horizon)
     C = ConfusionMatrix(classes, horizon, distance_bins=distance_bins)
     Nscenes = len(nusc.scene)
-
+    dirname=get_dirname()
     # instantiating YoLo obkect:
     yolo = YoLo( nms_thresh, iou_thresh)
     print(Nscenes)
     for n in range(1,Nscenes+1):
+        fname = dirname + "/scene_"+str(n)+"_matchings.p"
+        if chk_stored_scenes and os.path.exists(fname) is False:
         print("Iteration ........ ", str(n))
         objects_detected = dict() # Matchings over objects detected
         scene = nusc.scene[n-1]
-        # print(scene)
         # iterating over timestamps / samples:
         sample_token = scene['first_sample_token']
         sample = nusc.get('sample', scene['first_sample_token'])
@@ -297,16 +318,14 @@ if __name__ == '__main__':
             sample_number += 1
 
         # Save data:
-        cwd = os.getcwd()
-        dirname = cwd + "/matchings_new"
-        # pdb.set_trace()
-        if os.path.exists(dirname) is False:
-            os.mkdir(dirname)
-        fname = dirname + "/scene_"+str(n)+"_matchings.p"
         pkl.dump(objects_detected, open(fname, "wb"))
 
     # Print confusion matrix:
-    C.print()
-    dirname = cwd + "/"
-    fname = dirname + "conf_matrix_hrzn_" + str(horizon) + "_distbin_" + str(distance_bins) + ".p"
+    C.print_cm()
+    if save_data_ext:
+        dirname = "/Volumes/Extreme SSD/cm_processing/" + traindir + "/"
+    else:
+        dirname = cwd + "/"
+    fname = dirname + "cm/prop_label_hrzn_cluster_cat" + str(horizon) + "_distbin_" + str(distance_bins) + ".p"
     pkl.dump(C.C, open(fname, "wb"))
+    pdb.set_trace()
