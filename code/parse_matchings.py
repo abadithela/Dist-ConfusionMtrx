@@ -3,18 +3,7 @@ import pdb
 import os
 import pickle as pkl
 from nuscenes.nuscenes import NuScenes, NuScenesExplorer
-dataroot="/Users/apurvabadithela/Documents/software/nuscenes/data/sets/nuscenes/"
 import numpy as np
-dataroot_ext = "/Volumes/Extreme SSD/nuscenes"
-traindir="trainval126"
-save_data_ext = True
-if save_data_ext:
-    nusc = NuScenes(version='v1.0-trainval', dataroot=dataroot_ext)
-    dirname = "/Volumes/Extreme SSD/cm_processing/" + traindir + "/matchings"
-else:
-    nusc = NuScenes(dataroot=dataroot)
-    cwd = os.getcwd()
-    dirname = cwd + "/matchings_new"
 import texttable
 from tabulate import tabulate
 import latextable
@@ -32,7 +21,7 @@ class ConfusionMatrix():
         self.map = dict()
         for k in range(len(classes)):
             self.map[k] = classes[k]
-        self.classes.append("no detection")
+        self.classes.append("empty")
         self.map[len(classes)-1] = ("empty",)
         self.reverse_map = {v: k for k, v in self.map.items()}
 
@@ -75,24 +64,6 @@ class ConfusionMatrix():
         #     pdb.set_trace()
         self.add_prediction(distance_bin, true_class, prediction_class)
 
-    # def compute_true_pos(self, conf_mat_indx):
-    #     conf_matrix = self.C[conf_mat_indx].copy()
-    #     pass
-    #
-    # def compute_true_neg(self, class, conf_mat_indx):
-    #     conf_matrix = self.C[conf_mat_indx].copy()
-    #     corr_pred = conf_matrix[class,class]
-    #     incorr_pred = sum(conf_matrix[:,class]) - corr_pred
-    #     tp = corr_pred/(incorr_pred + corr_pred)
-    #     return tp
-    #
-    # def compute_false_neg(self, class, conf_mat_indx):
-    #     conf_matrix = self.C[conf_mat_indx].copy()
-    #     pass
-    #
-    # def compute_false_pos(self, class, conf_mat_indx):
-    #     conf_matrix = self.C[conf_mat_indx].copy()
-    #     pass
 
     def print_cm(self):
         # TO-DO: make it generic
@@ -118,7 +89,7 @@ def cluster_categories(categories):
         if "human" in category and category not in sup_categories.keys():
             sup_categories[category] = "pedestrian"
         elif "vehicle" in category and category not in sup_categories.keys():
-            sup_categories[category] = "obstacle"
+            sup_categories[category] = "vehicle"
         else:
             if category not in sup_categories.keys():
                 sup_categories[category] = "obstacle"
@@ -149,6 +120,17 @@ if __name__ == '__main__':
     sup_categories = cluster_categories(categories)
     classes = ["pedestrian",  "vehicle", "obstacle"]
     distance_bins = 5
+    dataroot="/Users/apurvabadithela/Documents/software/nuscenes/data/sets/nuscenes/"
+    dataroot_ext = "/Volumes/Extreme SSD/nuscenes"
+    traindir="trainval126"
+    save_data_ext = True
+    if save_data_ext:
+        nusc = NuScenes(version='v1.0-trainval', dataroot=dataroot_ext)
+        dirname = "/Volumes/Extreme SSD/cm_processing/" + traindir + "/matchings"
+    else:
+        nusc = NuScenes(dataroot=dataroot)
+        cwd = os.getcwd()
+        dirname = cwd + "/matchings_new"
     C = ConfusionMatrix(classes, horizon, distance_bins)
     Nscenes = len(nusc.scene)
     for n in range(1,Nscenes+1):

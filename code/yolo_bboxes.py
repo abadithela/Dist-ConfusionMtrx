@@ -53,6 +53,7 @@ class YoLo():
         plt.rcParams['figure.figsize'] = [24.0, 14.0]
         img = cv2.imread(data_path) # Successfully reading data
         # Convert the image to RGB
+        # pdb.set_trace()
         original_image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         # We resize the image to the input width and height of the first layer of the network.
         resized_image = cv2.resize(original_image, (self.m.width, self.m.height))
