@@ -28,8 +28,8 @@ class GenClassCM():
         else:
             self.dataroot="/Users/apurvabadithela/Documents/software/nuscenes/data/sets/nuscenes"
         self.traindir = "trainval-all"
-	self.dataroot = "/groups/murray-biocircuits/abadithela/data/sets/nuscenes"
-	self.save_data_ext = save_data_ext # parameter to save on external ssd
+	    self.dataroot = "/groups/murray-biocircuits/abadithela/data/sets/nuscenes"
+	    self.save_data_ext = save_data_ext # parameter to save on external ssd
         self.chk_stored_scenes = chk_stored_scenes # parameter to not resolve for already solved scenes
         self.nusc = NuScenes(version='v1.0-trainval', dataroot=self.dataroot)
         self.nms_thresh = 0.6
