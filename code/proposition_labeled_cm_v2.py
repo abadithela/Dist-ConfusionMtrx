@@ -35,6 +35,8 @@ class GenPropCM():
             self.dataroot = "/Volumes/Extreme SSD/nuscenes"
         else:
             self.dataroot="/Users/apurvabadithela/Documents/software/nuscenes/data/sets/nuscenes"
+        self.traindir = "trainval-all"
+	    self.dataroot = "/groups/murray-biocircuits/abadithela/data/sets/nuscenes"
         self.save_data_ext = save_data_ext # parameter to save on external ssd
         self.chk_stored_scenes = chk_stored_scenes # parameter to not resolve for already solved scenes
         if save_data_ext:
@@ -328,7 +330,7 @@ class GenPropCM():
     def print_cm(self, fname_suff):
         self.C.print_cm()
         if self.save_data_ext:
-            dirname = "/Volumes/Extreme SSD/cm_processing/" + self.traindir + "/"
+            dirname = "/groups/murray-biocircuits/abadithela/cm_processing" + self.traindir + "/"
         else:
             cwd = os.getcwd()
             dirname = cwd + "/"
@@ -371,9 +373,9 @@ class GenPropCM():
         self.print_cm(self.cm_fname) # Print confusion matrix
 
 if __name__ == '__main__':
-    example = "full"
+    example = "full1"
     class_dict = {0: 'pedestrian', 1:'vehicle', 2:'obstacle', 3:'empty'}
-    # class_dict = {0: 'pedestrian', 1:'obstacle', 2:'empty'}
+    class_dict = {0: 'pedestrian', 1:'obstacle', 2:'empty'}
     sensors = ['CAM_FRONT']
 
     if example =="mini":
@@ -384,7 +386,12 @@ if __name__ == '__main__':
         gen_cm_mini.construct_cm()
 
     if example =="full":
-        cm_type = "prop_based"
-        cm_fname = "full_4prop_cm_ped_obs_cam_f_hz_"
-        gen_cm_full = GenPropCM(save_data_ext=True, chk_stored_scenes=False, class_dict=class_dict, sensors=sensors, cm_type = cm_type, cm_fname = cm_fname)
+        cm_type = "class_based"
+        cm_fname = "full_3prop_cm_ped_obs_cam_f_hz_"
+        gen_cm_full = GenClassCM(save_data_ext=True, chk_stored_scenes=False, class_dict=class_dict, sensors=sensors, cm_type = cm_type, cm_fname = cm_fname)
+        gen_cm_full.construct_cm()
+    if example =="full1":
+        cm_type = "class_based"
+        cm_fname = "full1_3prop_cm_ped_obs_cam_f_hz_"
+        gen_cm_full = GenClassCM(ntrain_dirs=1, save_data_ext=True, chk_stored_scenes=False, class_dict=class_dict, sensors=sensors, cm_type = cm_type, cm_fname = cm_fname)
         gen_cm_full.construct_cm()
