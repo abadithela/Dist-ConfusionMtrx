@@ -30,19 +30,12 @@ def get_nclasses(Nclasses, cm_type):
 class GenPropCM():
     def __init__(self, dataroot=None, traindir="trainval-all", ntrain_dirs =10, save_data_ext=False, chk_stored_scenes=False, horizon=100, discrete_horizon=10, class_dict={0: 'pedestrian', 1:'obstacle', 2:'empty'}, sensors=['CAM_FRONT', 'CAM_FRONT_LEFT', 'CAM_FRONT_RIGHT'], cm_type="prop_based", cm_fname=None):
         self.cm_fname=cm_fname
-        if traindir == "trainval-all":
-            self.traindir="trainval-all"
-            self.dataroot = "/Volumes/Extreme SSD/nuscenes"
-        else:
-            self.dataroot="/Users/apurvabadithela/Documents/software/nuscenes/data/sets/nuscenes"
         self.traindir = "trainval-all"
-	    self.dataroot = "/groups/murray-biocircuits/abadithela/data/sets/nuscenes"
+        self.dataroot = "/groups/murray-biocircuits/abadithela/data/sets/nuscenes"
         self.save_data_ext = save_data_ext # parameter to save on external ssd
         self.chk_stored_scenes = chk_stored_scenes # parameter to not resolve for already solved scenes
-        if save_data_ext:
-            self.nusc = NuScenes(version='v1.0-trainval', dataroot=self.dataroot)
-        else:
-            self.nusc = NuScenes(dataroot=self.dataroot)
+
+        self.nusc = NuScenes(dataroot=self.dataroot)
         self.nms_thresh = 0.6
         self.iou_thresh = 0.4
         self.ntrain_dirs = ntrain_dirs
@@ -69,7 +62,7 @@ class GenPropCM():
 
     def get_dirname(self):
         if self.save_data_ext:
-            dirname = "/Volumes/Extreme SSD/cm_processing/" + self.traindir + "/matchings"
+            dirname = "/groups/murray-biocircuits/abadithela/cm_processing/" + self.traindir + "/matchings"
         else:
             cwd = os.getcwd()
             dirname = cwd + "/matchings_new"
