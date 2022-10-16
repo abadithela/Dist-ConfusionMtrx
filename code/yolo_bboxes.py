@@ -21,6 +21,8 @@ from shapely.geometry import MultiPoint, box
 
 ## Nuscenes dataset:
 dataroot="/groups/murray-biocircuits/abadithela/data/sets/nuscenes"
+dataroot="/Users/apurvabadithela/Documents/software/nuscenes/data/sets/nuscenes"
+
 nusc = NuScenes(dataroot=dataroot)
 nms_thresh = 0.6
 iou_thresh = 0.4
