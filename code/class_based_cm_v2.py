@@ -28,7 +28,7 @@ class GenClassCM():
         # else:
         #     self.dataroot="/Users/apurvabadithela/Documents/software/nuscenes/data/sets/nuscenes"
         self.traindir = "trainval-all"
-        self.dataroot = "/groups/murray-biocircuits/abadithela/data/sets/nuscenes"
+        self.dataroot = "/home/apurvabadithela/software/data/sets/nuscenes"
         self.save_data_ext = save_data_ext # parameter to save on external ssd
         self.chk_stored_scenes = chk_stored_scenes # parameter to not resolve for already solved scenes
         self.nusc = NuScenes(version='v1.0-trainval', dataroot=self.dataroot)
@@ -58,7 +58,7 @@ class GenClassCM():
 
     def get_dirname(self):
         if self.save_data_ext:
-            dirname = "/groups/murray-biocircuits/abadithela/cm_processing/" + self.traindir + "/matchings_class"
+            dirname = "/home/apurvabadithela/software/cm_processed/" + self.traindir + "/matchings_class"
         else:
             cwd = os.getcwd()
             dirname = cwd + "/matchings_class"
@@ -294,7 +294,7 @@ class GenClassCM():
     def print_cm(self, fname_suff):
         self.C.print_cm()
         if self.save_data_ext:
-            dirname = "/groups/murray-biocircuits/abadithela/cm_processing" + self.traindir + "/"
+            dirname = "/home/apurvabadithela/software/cm_processed/" + self.traindir + "/"
         else:
             cwd = os.getcwd()
             dirname = cwd + "/"
@@ -333,7 +333,7 @@ class GenClassCM():
                     sample, sample_token = self.get_next_sample(sample)
                     sample_number += 1
                 # Save data:
-                # pkl.dump(objects_detected, open(fname, "wb"))
+                pkl.dump(objects_detected, open(fname, "wb"))
         self.print_cm(self.cm_fname) # Print confusion matrix
 
 if __name__ == '__main__':

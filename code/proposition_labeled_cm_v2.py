@@ -31,7 +31,7 @@ class GenPropCM():
     def __init__(self, dataroot=None, traindir="trainval-all", ntrain_dirs =10, save_data_ext=False, chk_stored_scenes=False, horizon=100, discrete_horizon=10, class_dict={0: 'pedestrian', 1:'obstacle', 2:'empty'}, sensors=['CAM_FRONT', 'CAM_FRONT_LEFT', 'CAM_FRONT_RIGHT'], cm_type="prop_based", cm_fname=None):
         self.cm_fname=cm_fname
         self.traindir = "trainval-all"
-        self.dataroot = "/groups/murray-biocircuits/abadithela/data/sets/nuscenes"
+        self.dataroot = "/home/apurvabadithela/software/data/sets/nuscenes"
         self.save_data_ext = save_data_ext # parameter to save on external ssd
         self.chk_stored_scenes = chk_stored_scenes # parameter to not resolve for already solved scenes
 
@@ -62,7 +62,7 @@ class GenPropCM():
 
     def get_dirname(self):
         if self.save_data_ext:
-            dirname = "/groups/murray-biocircuits/abadithela/cm_processing/" + self.traindir + "/matchings"
+            dirname = "/home/apurvabadithela/software/cm_processed/" + self.traindir + "/matchings"
         else:
             cwd = os.getcwd()
             dirname = cwd + "/matchings_new"
@@ -323,7 +323,7 @@ class GenPropCM():
     def print_cm(self, fname_suff):
         self.C.print_cm()
         if self.save_data_ext:
-            dirname = "/groups/murray-biocircuits/abadithela/cm_processing" + self.traindir + "/"
+            dirname = "/home/apurvabadithela/software/cm_processed/" + self.traindir + "/"
         else:
             cwd = os.getcwd()
             dirname = cwd + "/"
@@ -362,7 +362,7 @@ class GenPropCM():
                     sample, sample_token = self.get_next_sample(sample)
                     sample_number += 1
                 # Save data:
-                # pkl.dump(objects_detected, open(fname, "wb"))
+                pkl.dump(objects_detected, open(fname, "wb"))
         self.print_cm(self.cm_fname) # Print confusion matrix
 
 if __name__ == '__main__':
@@ -381,10 +381,10 @@ if __name__ == '__main__':
     if example =="full":
         cm_type = "class_based"
         cm_fname = "full_3prop_cm_ped_obs_cam_f_hz_"
-        gen_cm_full = GenClassCM(save_data_ext=True, chk_stored_scenes=False, class_dict=class_dict, sensors=sensors, cm_type = cm_type, cm_fname = cm_fname)
+        gen_cm_full = GenPropCM(save_data_ext=True, chk_stored_scenes=False, class_dict=class_dict, sensors=sensors, cm_type = cm_type, cm_fname = cm_fname)
         gen_cm_full.construct_cm()
     if example =="full1":
         cm_type = "class_based"
         cm_fname = "full1_3prop_cm_ped_obs_cam_f_hz_"
-        gen_cm_full = GenClassCM(ntrain_dirs=1, save_data_ext=True, chk_stored_scenes=False, class_dict=class_dict, sensors=sensors, cm_type = cm_type, cm_fname = cm_fname)
+        gen_cm_full = GenPropCM(ntrain_dirs=1, save_data_ext=True, chk_stored_scenes=False, class_dict=class_dict, sensors=sensors, cm_type = cm_type, cm_fname = cm_fname)
         gen_cm_full.construct_cm()

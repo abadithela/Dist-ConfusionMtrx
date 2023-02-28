@@ -110,19 +110,10 @@ def process_objects_detected(C, objects_detected, category_map):
             C.process_detections(detection) # Adding to confusion matrix
 
 
-
 if __name__ == '__main__':
-    categories = []
-    for category_dict in nusc.category:
-        cat_name = category_dict['name']
-        if cat_name not in categories:
-            categories.append(cat_name)
-    sup_categories = cluster_categories(categories)
-    classes = ["pedestrian",  "vehicle", "obstacle"]
-    distance_bins = 5
     dataroot="/Users/apurvabadithela/Documents/software/nuscenes/data/sets/nuscenes/"
     dataroot_ext = "/Volumes/Extreme SSD/nuscenes"
-    traindir="trainval126"
+    traindir="trainval-all"
     save_data_ext = True
     if save_data_ext:
         nusc = NuScenes(version='v1.0-trainval', dataroot=dataroot_ext)
@@ -131,9 +122,22 @@ if __name__ == '__main__':
         nusc = NuScenes(dataroot=dataroot)
         cwd = os.getcwd()
         dirname = cwd + "/matchings_new"
+
+    categories = []
+    for category_dict in nusc.category:
+        cat_name = category_dict['name']
+        if cat_name not in categories:
+            categories.append(cat_name)
+    sup_categories = cluster_categories(categories)
+    horizon = 100
+    classes = ["pedestrian", "obstacle"]
+    distance_bins = 10
+    
+    
     C = ConfusionMatrix(classes, horizon, distance_bins)
     Nscenes = len(nusc.scene)
-    for n in range(1,Nscenes+1):
+    N = 85
+    for n in range(1,N+1):
         scene = nusc.scene[n-1]
         fname = dirname + "/scene_"+str(n)+"_matchings.p"
         with (open(fname, "rb")) as openfile:
